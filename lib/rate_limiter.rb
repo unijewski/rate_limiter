@@ -8,11 +8,11 @@ class RateLimiter
 
   def call(env)
     status, headers, body = @app.call(env)
-    add_x_ratelimit(headers)
+    set_x_ratelimit(headers)
     [status, headers, body]
   end
 
-  def add_x_ratelimit(headers)
+  def set_x_ratelimit(headers)
     value = @options[:limit] || 60
     headers.merge!('X-RateLimit-Limit' => value)
   end
