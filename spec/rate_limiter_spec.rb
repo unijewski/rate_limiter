@@ -1,11 +1,11 @@
 require 'spec_helper'
 
 describe RateLimiter do
-  it 'has a version number' do
-    expect(RateLimiter::VERSION).not_to be nil
-  end
+  let(:app) { proc { ['200', { 'Content-Type' => 'text/html' }, ['Hello world']] } }
 
-  it 'does something useful' do
-    expect(false).to eq(true)
+  it 'should respond successfully' do
+    get '/'
+    expect(last_response.status).to eq 200
+    expect(last_response.body).to eq 'Hello world'
   end
 end
