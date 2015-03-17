@@ -21,18 +21,27 @@ describe RateLimiter do
     end
   end
 
-  context 'when we send a request with options' do
-    let(:stack) { RateLimiter.new(app, limit: '40') }
+  context 'when we send requests with options' do
+    let(:stack) { RateLimiter.new(app, limit: '10') }
 
     it 'should contain the proper limit' do
-      expect(response.headers['X-RateLimit-Limit']).to eq '40'
+      expect(response.headers['X-RateLimit-Limit']).to eq '10'
     end
 
     context '5 times in total' do
       before { 4.times { request.get('/') } }
 
       it 'should decrease X-RateLimit-Remaining' do
-        expect(response.headers['X-RateLimit-Remaining']).to eq '35'
+        expect(response.headers['X-RateLimit-Remaining']).to eq '5'
+      end
+    end
+
+    context 'the limit was reached' do
+      before { 12.times { request.get('/') } }
+
+      it 'should get the 429 status code' do
+        expect(response.status).to eq 429
+        expect(stack).not_to receive(:call)
       end
     end
   end
