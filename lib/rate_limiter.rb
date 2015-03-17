@@ -12,8 +12,12 @@ class RateLimiter
 
   def call(env)
     status, headers, body = @app.call(env)
-    define_headers(headers)
-    [status, headers, body]
+    if xratelimit_reached?
+      [429, {}, []]
+    else
+      define_headers(headers)
+      [status, headers, body]
+    end
   end
 
   private
@@ -26,5 +30,9 @@ class RateLimiter
 
   def decrease_xratelimit
     @remaining_xratelimit -= 1
+  end
+
+  def xratelimit_reached?
+    @remaining_xratelimit < 0
   end
 end
