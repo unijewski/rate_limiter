@@ -52,5 +52,18 @@ describe RateLimiter do
         end
       end
     end
+
+    context 'when different users send requests' do
+      let(:app) { RateLimiter.new(info, limit: '10') }
+
+      it 'should set a proper remaining limit for each of them' do
+        get('/', {}, 'REMOTE_ADDR' => '10.0.0.1')
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '9'
+        2.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.2') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '8'
+        3.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.3') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '7'
+      end
+    end
   end
 end
