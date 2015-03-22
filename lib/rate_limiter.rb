@@ -2,22 +2,33 @@ require 'rate_limiter/version'
 require 'pry'
 
 class RateLimiter
-  def initialize(app, options = { limit: 60 })
+  def initialize(app, options = { limit: 60 }, &block)
     @app = app
     @options = options
     @rate_limit = @options[:limit]
     @reset_limit_at = time_now + 3600
     @clients = {}
+    @block = block
+    @block_given = block_given?
   end
 
   def call(env)
-    @ip = env['REMOTE_ADDR']
+    status, headers, body = @app.call(env)
+
+    if @block_given && !@block.call(env).nil?
+      @id = @block.call(env)
+    elsif @block_given && @block.call(env).nil?
+      return [status, headers, body]
+    else
+      @id = env['REMOTE_ADDR']
+    end
+
     find_or_create_client
     reset_rate_limit
+
     if rate_limit_reached?
-      [429, {}, []]
+      return [429, {}, []]
     else
-      status, headers, body = @app.call(env)
       define_headers(headers)
       [status, headers, body]
     end
@@ -63,13 +74,13 @@ class RateLimiter
   end
 
   def find_or_create_client
-    if @clients.select { |client| client[@ip] }.empty?
-      @clients[@ip] = {
+    if @clients.select { |client| client[@id] }.empty?
+      @clients[@id] = {
         rate_limit: @rate_limit,
         remaining_rate_limit: @rate_limit,
         reset_limit_at: @reset_limit_at
       }
     end
-    @current_client = @clients[@ip]
+    @current_client = @clients[@id]
   end
 end

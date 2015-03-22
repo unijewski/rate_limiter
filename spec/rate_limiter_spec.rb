@@ -58,16 +58,48 @@ describe RateLimiter do
     end
   end
 
-  context 'when different users send requests' do
-    let(:app) { Rack::Lint.new(RateLimiter.new(empty_app, limit: 10)) }
+  context 'when we distinguish requests' do
+    context 'and the block is given' do
+      let(:app) do
+        Rack::Lint.new(RateLimiter.new(empty_app, limit: 10) do |env|
+          Rack::Request.new(env).params['api_token']
+        end)
+      end
 
-    it 'should set a proper remaining limit for each of them' do
-      get('/', {}, 'REMOTE_ADDR' => '10.0.0.1')
-      expect(last_response.headers['X-RateLimit-Remaining']).to eq '9'
-      2.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.2') }
-      expect(last_response.headers['X-RateLimit-Remaining']).to eq '8'
-      3.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.3') }
-      expect(last_response.headers['X-RateLimit-Remaining']).to eq '7'
+      it 'should set the rate limiting headers for each of requests' do
+        get('/?api_token=token')
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '9'
+        2.times { get('/?api_token=token2') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '8'
+        5.times { get('/?api_token=token3') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '5'
+      end
+    end
+
+    context 'and the block is as nil' do
+      let(:app) do
+        Rack::Lint.new(RateLimiter.new(empty_app, limit: 10) { nil })
+      end
+
+      it 'should set remaining limit header to nil' do
+        get('/?api_token=token')
+        expect(last_response.headers).not_to include('X-RateLimit-Limit')
+        expect(last_response.headers).not_to include('X-RateLimit-Remaining')
+        expect(last_response.headers).not_to include('X-RateLimit-Reset')
+      end
+    end
+
+    context 'and the block is not given' do
+      let(:app) { Rack::Lint.new(RateLimiter.new(empty_app, limit: 10)) }
+
+      it 'should set a proper remaining limit for each of them' do
+        get('/', {}, 'REMOTE_ADDR' => '10.0.0.1')
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '9'
+        2.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.2') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '8'
+        3.times { get('/', {}, 'REMOTE_ADDR' => '10.0.0.3') }
+        expect(last_response.headers['X-RateLimit-Remaining']).to eq '7'
+      end
     end
   end
 end
