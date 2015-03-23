@@ -2,36 +2,26 @@ require 'rate_limiter/version'
 require 'pry'
 
 class RateLimiter
+  DEFAULT_BLOCK = proc { |env| env['REMOTE_ADDR'] }
+
   def initialize(app, options = { limit: 60 }, &block)
     @app = app
     @options = options
     @rate_limit = @options[:limit]
     @reset_limit_at = time_now + 3600
     @clients = {}
-    @block = block
-    @block_given = block_given?
+    @block = block || DEFAULT_BLOCK
   end
 
   def call(env)
-    status, headers, body = @app.call(env)
-
-    if @block_given && !@block.call(env).nil?
-      @id = @block.call(env)
-    elsif @block_given && @block.call(env).nil?
-      return [status, headers, body]
-    else
-      @id = env['REMOTE_ADDR']
-    end
-
+    @id = @block.call(env)
     find_or_create_client
     reset_rate_limit
-
-    if rate_limit_reached?
-      return [429, {}, []]
-    else
-      define_headers(headers)
-      [status, headers, body]
-    end
+    return [429, {}, []] if rate_limit_reached?
+    status, headers, body = @app.call(env)
+    return [status, headers, body] if @id.nil?
+    define_headers(headers)
+    [status, headers, body]
   end
 
   private
