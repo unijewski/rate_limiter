@@ -9,7 +9,7 @@ class RateLimiter
     options = { limit: 60, store: Store.new }.merge(options)
     @app = app
     @options = options
-    @rate_limit = @options[:limit]
+    @total_limit = @options[:limit]
     @reset_limit_at = time_now + 3600
     @clients = options[:store]
     @block = block || DEFAULT_BLOCK
@@ -19,16 +19,16 @@ class RateLimiter
     @id = @block.call(env)
     find_or_create_client
     reset_rate_limit
-    return [429, {}, []] if rate_limit_reached?
+    return [429, {}, []] if total_limit_reached?
     status, headers, body = @app.call(env)
     return [status, headers, body] if @id.nil?
-    define_headers(headers)
+    add_headers(headers)
     [status, headers, body]
   end
 
   private
 
-  def define_headers(headers)
+  def add_headers(headers)
     decrease_rate_limit
     add_rate_limit_header(headers)
     add_remaining_rate_limit_header(headers)
@@ -40,7 +40,7 @@ class RateLimiter
   end
 
   def add_rate_limit_header(headers)
-    headers['X-RateLimit-Limit'] = @current_client[:rate_limit].to_s
+    headers['X-RateLimit-Limit'] = @current_client[:total_limit].to_s
   end
 
   def add_remaining_rate_limit_header(headers)
@@ -51,14 +51,14 @@ class RateLimiter
     headers['X-RateLimit-Reset'] = @current_client[:reset_limit_at].to_s
   end
 
-  def rate_limit_reached?
+  def total_limit_reached?
     @current_client[:remaining_rate_limit] <= 0
   end
 
   def reset_rate_limit
     return unless time_now > @current_client[:reset_limit_at]
     @current_client[:reset_limit_at] = time_now + 3600
-    @current_client[:remaining_rate_limit] = @rate_limit
+    @current_client[:remaining_rate_limit] = @total_limit
   end
 
   def time_now
@@ -67,12 +67,12 @@ class RateLimiter
 
   def find_or_create_client
     if @clients.get(@id).nil?
-      @clients.set(@id,
-      {
-        rate_limit: @rate_limit,
-        remaining_rate_limit: @rate_limit,
+      @clients.set(
+        @id,
+        total_limit: @total_limit,
+        remaining_rate_limit: @total_limit,
         reset_limit_at: @reset_limit_at
-      })
+      )
     end
     @current_client = @clients.get(@id)
   end
