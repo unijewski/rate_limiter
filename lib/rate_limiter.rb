@@ -1,15 +1,17 @@
 require 'rate_limiter/version'
+require 'rate_limiter/store'
 require 'pry'
 
 class RateLimiter
   DEFAULT_BLOCK = proc { |env| env['REMOTE_ADDR'] }
 
-  def initialize(app, options = { limit: 60 }, &block)
+  def initialize(app, options = {}, &block)
+    options = { limit: 60, store: Store.new }.merge(options)
     @app = app
     @options = options
     @rate_limit = @options[:limit]
     @reset_limit_at = time_now + 3600
-    @clients = {}
+    @clients = options[:store]
     @block = block || DEFAULT_BLOCK
   end
 
@@ -64,13 +66,14 @@ class RateLimiter
   end
 
   def find_or_create_client
-    if @clients.select { |client| client[@id] }.empty?
-      @clients[@id] = {
+    if @clients.get(@id).nil?
+      @clients.set(@id,
+      {
         rate_limit: @rate_limit,
         remaining_rate_limit: @rate_limit,
         reset_limit_at: @reset_limit_at
-      }
+      })
     end
-    @current_client = @clients[@id]
+    @current_client = @clients.get(@id)
   end
 end

@@ -102,4 +102,21 @@ describe RateLimiter do
       end
     end
   end
+
+  context 'when we use the custom store' do
+    let(:store) { Store.new }
+    let(:hash) { { remaining_rate_limit: 30, reset_limit_at: time + 1000 } }
+    let(:app) { Rack::Lint.new(RateLimiter.new(empty_app, store: store)) }
+
+    before do
+      expect(store).to receive(:get).at_least(:once).with('10.0.0.1').and_return(hash)
+      get('/', {}, 'REMOTE_ADDR' => '10.0.0.1')
+    end
+
+    it 'should set and get proper values' do
+      expect(store.get('10.0.0.1')).to eq(hash)
+      expect(last_response.headers['X-RateLimit-Remaining']).to eq '29'
+      expect(last_response.headers['X-RateLimit-Reset']).to eq((time + 1000).to_s)
+    end
+  end
 end
