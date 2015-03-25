@@ -1,6 +1,5 @@
 require 'rate_limiter/version'
 require 'rate_limiter/store'
-require 'pry'
 
 class RateLimiter
   DEFAULT_BLOCK = proc { |env| env['REMOTE_ADDR'] }
