@@ -3,11 +3,11 @@ class Store
     @data = {}
   end
 
-  def get(id)
-    @data[id]
+  def get(attr)
+    @data[attr].dup if @data.key?(attr)
   end
 
-  def set(id, client_data)
-    @data[id] = client_data
+  def set(attr, client_data)
+    @data[attr] = client_data
   end
 end
