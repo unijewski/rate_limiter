@@ -2,7 +2,7 @@ require 'rate_limiter/version'
 require 'rate_limiter/store'
 
 class RateLimiter
-  DEFAULT_BLOCK = proc { |env| env['REMOTE_ADDR'] }
+  DEFAULT_BLOCK = proc { |env| env['HTTP_X_FORWARDED_FOR'] || env['REMOTE_ADDR'] }
 
   def initialize(app, options = {}, &block)
     options = { limit: 60, store: Store.new }.merge(options)
