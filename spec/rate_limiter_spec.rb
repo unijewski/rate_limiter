@@ -3,7 +3,6 @@ require 'spec_helper'
 describe RateLimiter do
   let(:empty_app) { proc { ['200', { 'Content-Type' => 'text/html' }, ['Hello world']] } }
   let(:app) { Rack::Lint.new(rate_limiter) }
-  let(:time) { Timecop.freeze(3600).to_i }
 
   context 'when we make multiple requests' do
     let(:rate_limiter) { RateLimiter.new(empty_app) }
@@ -21,7 +20,12 @@ describe RateLimiter do
   context 'when the middleware does not have any specified options' do
     let(:rate_limiter) { RateLimiter.new(empty_app) }
 
-    before { get('/') }
+    before do
+      get('/')
+      Timecop.freeze.to_i
+    end
+
+    after { Timecop.return }
 
     it 'should respond successfully' do
       expect(last_response.status).to eq 200
@@ -31,19 +35,24 @@ describe RateLimiter do
     it 'should contain the rate limiting headers' do
       expect(last_response.headers['X-RateLimit-Limit']).to eq '60'
       expect(last_response.headers['X-RateLimit-Remaining']).to eq '59'
-      expect(last_response.headers['X-RateLimit-Reset']).to eq time.to_s
+      expect(last_response.headers['X-RateLimit-Reset']).to eq((Time.now.to_i + 3600).to_s)
     end
   end
 
   context 'when the middleware has given limit as an option' do
     let(:rate_limiter) { RateLimiter.new(empty_app, limit: 10) }
 
-    before { 2.times { get('/') } }
+    before do
+      2.times { get('/') }
+      Timecop.freeze.to_i
+    end
+
+    after { Timecop.return }
 
     it 'should contain the rate limiting headers' do
       expect(last_response.headers['X-RateLimit-Limit']).to eq '10'
       expect(last_response.headers['X-RateLimit-Remaining']).to eq '8'
-      expect(last_response.headers['X-RateLimit-Reset']).to eq time.to_s
+      expect(last_response.headers['X-RateLimit-Reset']).to eq((Time.now.to_i + 3600).to_s)
     end
 
     it 'should respond successfully 10 times in total' do
@@ -52,9 +61,10 @@ describe RateLimiter do
     end
 
     context 'and the limit was reached' do
-      before { 9.times { get('/') } }
+      before { 8.times { get('/') } }
 
       it 'should get the 429 status code' do
+        get('/')
         expect(last_response.status).to eq 429
       end
 
@@ -69,7 +79,7 @@ describe RateLimiter do
         it 'should reset the limit' do
           get('/')
           expect(last_response.headers['X-RateLimit-Remaining']).to eq '9'
-          expect(last_response.headers['X-RateLimit-Reset']).to eq time.to_s
+          expect(last_response.headers['X-RateLimit-Reset']).to eq((Time.now.to_i + 3600).to_s)
         end
       end
     end
@@ -122,7 +132,7 @@ describe RateLimiter do
 
   describe 'Custom store' do
     let(:store) { Store.new }
-    let(:hash) { { remaining_rate_limit: 30, reset_limit_at: time + 1000 } }
+    let(:hash) { { remaining_rate_limit: 30, reset_limit_at: Time.now.to_i + 1000 } }
     let(:rate_limiter) { RateLimiter.new(empty_app, store: store) }
 
     context 'when we call the store' do
@@ -134,7 +144,7 @@ describe RateLimiter do
       it 'should set and get proper values' do
         expect(store.get('10.0.0.1')).to eq(hash)
         expect(last_response.headers['X-RateLimit-Remaining']).to eq '29'
-        expect(last_response.headers['X-RateLimit-Reset']).to eq((time + 1000).to_s)
+        expect(last_response.headers['X-RateLimit-Reset']).to eq((Time.now.to_i + 1000).to_s)
       end
     end
   end
