@@ -10,44 +10,36 @@ class RateLimiter
     @options = options
     @total_limit = @options[:limit]
     @reset_limit_at = time_now + 3600
-    @clients = options[:store]
+    @store = options[:store]
     @block = block || DEFAULT_BLOCK
   end
 
   def call(env)
     @id = @block.call(env)
-    find_or_create_client
-    reset_rate_limit
-    return [429, {}, []] if total_limit_reached?
-    status, headers, body = @app.call(env)
-    return [status, headers, body] if @id.nil?
-    add_headers(headers)
-    [status, headers, body]
+
+    unless @id.nil?
+      find_or_create_client
+      reset_rate_limit
+      return [429, {}, []] if total_limit_reached?
+      decrease_rate_limit
+    end
+
+    @app.call(env).tap do |_status, headers, _body|
+      add_headers(headers) unless @id.nil?
+    end
   end
 
   private
 
   def add_headers(headers)
-    decrease_rate_limit
-    add_rate_limit_header(headers)
-    add_remaining_rate_limit_header(headers)
-    add_reset_limit_at_header(headers)
+    headers['X-RateLimit-Limit'] = @total_limit.to_s
+    headers['X-RateLimit-Remaining'] = @current_client[:remaining_rate_limit].to_s
+    headers['X-RateLimit-Reset'] = @current_client[:reset_limit_at].to_s
   end
 
   def decrease_rate_limit
     @current_client[:remaining_rate_limit] -= 1
-  end
-
-  def add_rate_limit_header(headers)
-    headers['X-RateLimit-Limit'] = @current_client[:total_limit].to_s
-  end
-
-  def add_remaining_rate_limit_header(headers)
-    headers['X-RateLimit-Remaining'] = @current_client[:remaining_rate_limit].to_s
-  end
-
-  def add_reset_limit_at_header(headers)
-    headers['X-RateLimit-Reset'] = @current_client[:reset_limit_at].to_s
+    @store.set(@id, @current_client)
   end
 
   def total_limit_reached?
@@ -58,6 +50,7 @@ class RateLimiter
     return unless time_now > @current_client[:reset_limit_at]
     @current_client[:reset_limit_at] = time_now + 3600
     @current_client[:remaining_rate_limit] = @total_limit
+    @store.set(@id, @current_client)
   end
 
   def time_now
@@ -65,14 +58,10 @@ class RateLimiter
   end
 
   def find_or_create_client
-    if @clients.get(@id).nil?
-      @clients.set(
-        @id,
-        total_limit: @total_limit,
-        remaining_rate_limit: @total_limit,
-        reset_limit_at: @reset_limit_at
-      )
+    if @store.get(@id).nil?
+      client_data = { remaining_rate_limit: @total_limit, reset_limit_at: @reset_limit_at }
+      @store.set(@id, client_data)
     end
-    @current_client = @clients.get(@id)
+    @current_client = @store.get(@id)
   end
 end
