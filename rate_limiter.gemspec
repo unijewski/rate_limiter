@@ -8,9 +8,9 @@ Gem::Specification.new do |spec|
   spec.version       = RateLimiter::VERSION
   spec.authors       = ['Grzegorz Unijewski']
   spec.email         = ['grzegorz@unijewski.pl']
-  spec.summary       = 'Pilot Academy Workshop: Rack'
-  spec.description   = ''
-  spec.homepage      = ''
+  spec.summary       = 'Rack middleware'
+  spec.description   = 'The gem was created at Pilot Academy Workshop: Rack'
+  spec.homepage      = 'https://github.com/unijewski/rate_limiter'
   spec.license       = 'MIT'
 
   spec.files         = `git ls-files -z`.split("\x0")
