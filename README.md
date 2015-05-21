@@ -1,6 +1,6 @@
 # RateLimiter
 
-This gem is a Rack middleware working like a filter that can pass the request on to an application and filter the response that is returned. It works with any Rack app. We can determine how many requests we handle within an hour and set a custom store, like [Dalli](https://github.com/mperham/dalli). The middleware is customized and able to distinguish clients that means instead of the IP address it can be based on `api_token` parameter from the request.
+This gem is a Rack middleware working like a filter that can pass the request on to an application and filter the response that is returned. It works with any Rack app. We can determine how many requests we handle within an hour and set a custom store, like [Dalli](https://github.com/mperham/dalli), to support typical Rails applications because they don't share memory, thus requests from the same client may hit different processes and receive incorrect results. Furthermore, the middleware is customizable and able to distinguish clients that means instead of the IP address it can be based on e.g. `api_token` parameter from the request.
 
 ## Installation
 
