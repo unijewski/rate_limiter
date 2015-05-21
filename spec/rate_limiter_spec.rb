@@ -137,12 +137,14 @@ describe RateLimiter do
 
     context 'when we call the store' do
       before do
-        expect(store).to receive(:get).at_least(:once).with('10.0.0.1').and_return(hash)
+        allow(store).to receive(:set)
+        allow(store).to receive(:get).with('10.0.0.1').and_return(hash)
         get('/', {}, 'REMOTE_ADDR' => '10.0.0.1')
       end
 
       it 'should set and get proper values' do
-        expect(store.get('10.0.0.1')).to eq(hash)
+        expect(store).to have_received(:set).with('10.0.0.1', hash).once
+        expect(store).to have_received(:get).with('10.0.0.1').twice
         expect(last_response.headers['X-RateLimit-Remaining']).to eq '29'
         expect(last_response.headers['X-RateLimit-Reset']).to eq((Time.now.to_i + 1000).to_s)
       end
